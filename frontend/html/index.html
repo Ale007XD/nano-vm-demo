@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>nano-vm — deterministic ai execution</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cousine:ital,wght@0,400;0,700;1,400&display=swap');
+
+:root {
+  --bg:      #0C0C0C;
+  --bg2:     #1D1F21;
+  --bg3:     #141416;
+  --border:  #373B41;
+  --text:    #C5C8C6;
+  --text2:   #707880;
+  --text3:   #4A4E56;
+  --cmd:     #5F819D;
+  --green:   #8BA87A;
+  --red:     #A85454;
+  --yellow:  #C4A84F;
+  --cyan:    #6FA3A8;
+  --white:   #EAEAEA;
+  --pad-in:  8px;
+  --pad-out: 16px;
+  --mono:    'Cousine', 'Consolas', monospace;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+a { color: var(--cmd); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ── NAV ── */
+nav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 100;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+.nav-inner {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0 var(--pad-out);
+  height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.nav-logo { color: var(--white); font-size: 13px; font-weight: 700; }
+.nav-logo span { color: var(--cmd); }
+.nav-links { display: flex; gap: var(--pad-out); list-style: none; }
+.nav-links a { color: var(--text2); font-size: 12px; }
+.nav-links a:hover { color: var(--text); text-decoration: none; }
+.nav-spacer { flex: 1; }
+.nav-cta {
+  color: var(--cmd);
+  border: 1px solid var(--border);
+  padding: 2px 10px;
+  font-size: 12px;
+  transition: border-color 0.15s;
+}
+.nav-cta:hover { border-color: var(--cmd); text-decoration: none; }
+
+/* ── HERO ── */
+.hero {
+  padding-top: 36px;
+  border-bottom: 1px solid var(--border);
+}
+.hero-inner {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: var(--pad-out);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--pad-out);
+  align-items: start;
+}
+.hero-tag { color: var(--text3); font-size: 11px; margin-bottom: 12px; }
+.hero-tag span { color: var(--cmd); }
+.hero-h1 { font-size: 22px; font-weight: 700; color: var(--white); line-height: 1.25; margin-bottom: 12px; }
+.hero-h1 em { color: var(--cmd); font-style: normal; }
+.hero-desc { color: var(--text2); font-size: 12px; line-height: 1.7; margin-bottom: 16px; max-width: 380px; }
+.hero-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 5px 14px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  background: transparent;
+  color: var(--text);
+  text-decoration: none;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.btn:hover { border-color: var(--text2); color: var(--white); text-decoration: none; }
+.btn-primary { border-color: var(--cmd); color: var(--cmd); }
+.btn-primary:hover { background: var(--cmd); color: var(--bg); }
+
+/* ── TERMINAL WINDOW ── */
+.term {
+  border: 1px solid var(--border);
+  background: var(--bg);
+}
+.term-bar {
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  padding: 5px var(--pad-in);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--text3);
+}
+.term-dot { width: 7px; height: 7px; border: 1px solid var(--border); }
+.term-title { margin-left: 6px; }
+.term-body { padding: var(--pad-in); }
+
+.prompt { display: flex; align-items: baseline; gap: 6px; padding: 2px 0; }
+.ps1-path { color: var(--green); }
+.ps1-sym { color: var(--text2); }
+.cmd-text { color: var(--white); }
+.out { color: var(--text2); padding: 1px 0 1px 14px; font-size: 12px; }
+.out-ok { color: var(--green); }
+.out-key { color: var(--cmd); }
+.out-val { color: var(--yellow); }
+.out-hash { color: var(--cyan); }
+.blank { height: 5px; }
+
+/* ── SECTION HEAD ── */
+.section-head {
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: var(--pad-in) var(--pad-out);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text3);
+}
+.sh-num { color: var(--cmd); }
+.sh-cursor { color: var(--green); animation: blink 1s step-end infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ── PROPS ── */
+.props {
+  display: grid;
+  grid-template-columns: repeat(3,1fr);
+  border-bottom: 1px solid var(--border);
+  max-width: 960px;
+  margin: 0 auto;
+}
+.prop {
+  padding: var(--pad-out);
+  border-right: 1px solid var(--border);
+}
+.prop:last-child { border-right: none; }
+.prop-num { color: var(--text3); font-size: 11px; margin-bottom: 6px; }
+.prop-title { color: var(--white); margin-bottom: 4px; }
+.prop-desc { color: var(--text2); font-size: 11px; line-height: 1.6; }
+
+/* ── DEMO ── */
+.demo-area {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: var(--pad-out);
+}
+.demo-tabs {
+  display: flex;
+  border: 1px solid var(--border);
+  border-bottom: none;
+  width: fit-content;
+}
+.tab-btn {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 4px 14px;
+  border: none;
+  background: var(--bg);
+  color: var(--text3);
+  cursor: pointer;
+  border-right: 1px solid var(--border);
+}
+.tab-btn:last-child { border-right: none; }
+.tab-btn.active { background: var(--bg2); color: var(--text); }
+.tab-btn:hover:not(.active) { color: var(--text2); }
+
+.demo-grid {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: var(--pad-out);
+  border: 1px solid var(--border);
+  padding: var(--pad-out);
+  background: var(--bg2);
+}
+
+/* ── FORM ── */
+.form-label {
+  color: var(--text3);
+  font-size: 11px;
+  margin-bottom: var(--pad-in);
+}
+.form-label::before { content: '# '; color: var(--cmd); }
+.field { margin-bottom: 8px; }
+.field-lbl {
+  color: var(--text3);
+  font-size: 11px;
+  margin-bottom: 3px;
+}
+.field-lbl::before { content: '> '; }
+.field input, .field textarea {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--white);
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: var(--pad-in);
+  outline: none;
+  border-radius: 0;
+  resize: none;
+  transition: border-color 0.15s;
+}
+.field input:focus, .field textarea:focus { border-color: var(--cmd); }
+.field input::placeholder, .field textarea::placeholder { color: var(--text3); }
+.field input[readonly], .field textarea[readonly] { color: var(--text2); border-style: dashed; }
+
+.run-btn {
+  width: 100%;
+  margin-top: 8px;
+  background: var(--bg);
+  border: 1px solid var(--cmd);
+  color: var(--cmd);
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 7px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: background 0.15s, color 0.15s;
+}
+.run-btn:hover { background: var(--cmd); color: var(--bg); }
+.run-btn:disabled { border-color: var(--border); color: var(--text3); background: var(--bg); cursor: not-allowed; }
+
+/* ── RESULT PANEL ── */
+.result-panel {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  min-height: 340px;
+  display: flex;
+  flex-direction: column;
+}
+.result-bar {
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  padding: 4px var(--pad-in);
+  display: flex;
+  gap: var(--pad-out);
+  font-size: 11px;
+  color: var(--text3);
+  flex-wrap: wrap;
+  min-height: 24px;
+}
+.meta-k { color: var(--text3); }
+.meta-v { color: var(--cyan); }
+.result-body { padding: var(--pad-in); flex: 1; }
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 280px;
+  gap: 5px;
+  color: var(--text3);
+  font-size: 11px;
+}
+
+/* ── TRACE ── */
+.trace-line {
+  display: grid;
+  grid-template-columns: 14px 150px 55px 1fr 55px;
+  gap: 8px;
+  align-items: center;
+  padding: 3px 0;
+  font-size: 12px;
+  border-bottom: 1px solid #161818;
+  animation: fadein 0.2s ease both;
+}
+.trace-line:last-child { border-bottom: none; }
+@keyframes fadein { from { opacity:0; transform: translateX(-4px); } to { opacity:1; } }
+.tl-1 { animation-delay: 0.04s; }
+.tl-2 { animation-delay: 0.12s; }
+.tl-3 { animation-delay: 0.22s; }
+.tl-4 { animation-delay: 0.32s; }
+.ti-ok  { color: var(--green); }
+.ti-llm { color: var(--cmd); }
+.t-id   { color: var(--white); }
+.t-type { color: var(--text3); font-size: 11px; }
+.t-det  { color: var(--text2); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.t-ms   { color: var(--text3); font-size: 11px; text-align: right; }
+
+.hash-line {
+  margin-top: 8px;
+  padding: var(--pad-in);
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  font-size: 12px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.hl-k { color: var(--text3); }
+.hl-v { color: var(--cyan); flex: 1; word-break: break-all; }
+
+.badge { font-size: 10px; padding: 1px 8px; border: 1px solid; }
+.badge-init  { border-color: var(--border); color: var(--text3); }
+.badge-match { border-color: var(--green); color: var(--green); }
+.badge-diff  { border-color: var(--red); color: var(--red); }
+
+.output-block {
+  margin-top: 8px;
+  padding: var(--pad-in);
+  background: var(--bg2);
+  border-left: 2px solid var(--cmd);
+  color: var(--text2);
+  font-size: 12px;
+  line-height: 1.7;
+  animation: fadein 0.4s 0.4s ease both;
+}
+.output-prompt { color: var(--text3); font-size: 11px; margin-bottom: 4px; }
+
+.action-row { display: flex; gap: 8px; margin-top: 8px; }
+.action-btn {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text2);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.action-btn:hover { border-color: var(--cmd); color: var(--cmd); }
+
+/* ── DIFF ── */
+.diff-header {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 4px;
+  font-size: 11px;
+}
+.diff-h-a { color: var(--green); }
+.diff-h-b { color: var(--red); }
+.diff-row  { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 3px; }
+.diff-cell { padding: 3px 6px; font-size: 11px; display: flex; justify-content: space-between; }
+.diff-ok   { background: #111B12; color: var(--green); }
+.diff-bad  { background: #1A1010; color: var(--red); }
+.diff-hashes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.diff-hash-cell { padding: var(--pad-in); background: var(--bg2); border: 1px solid var(--border); font-size: 11px; }
+.diff-reason {
+  margin-top: 8px;
+  padding: var(--pad-in);
+  background: #160C0C;
+  border: 1px solid var(--red);
+  border-left: 2px solid var(--red);
+  color: var(--red);
+  font-size: 11px;
+}
+.diff-reason-ok {
+  margin-top: 8px;
+  padding: var(--pad-in);
+  background: #0C160C;
+  border: 1px solid var(--green);
+  border-left: 2px solid var(--green);
+  color: var(--green);
+  font-size: 11px;
+}
+
+/* ── FEATURES ── */
+.feat-grid {
+  display: grid;
+  grid-template-columns: repeat(3,1fr);
+  border-bottom: 1px solid var(--border);
+  max-width: 960px;
+  margin: 0 auto;
+}
+.feat {
+  padding: var(--pad-out);
+  border-right: 1px solid var(--border);
+}
+.feat:last-child { border-right: none; }
+.feat-num { color: var(--text3); font-size: 11px; margin-bottom: 8px; }
+.feat-title { color: var(--white); margin-bottom: 6px; }
+.feat-title span { color: var(--cmd); }
+.feat-body { color: var(--text2); font-size: 11px; line-height: 1.65; }
+
+/* ── CASES ── */
+.cases-grid {
+  display: grid;
+  grid-template-columns: repeat(3,1fr);
+  border-bottom: 1px solid var(--border);
+  max-width: 960px;
+  margin: 0 auto;
+}
+.case { padding: var(--pad-out); border-right: 1px solid var(--border); }
+.case:last-child { border-right: none; }
+.case-sector { color: var(--cmd); font-size: 11px; margin-bottom: 6px; }
+.case-title { color: var(--white); margin-bottom: 6px; }
+.case-body { color: var(--text2); font-size: 11px; line-height: 1.65; }
+
+/* ── TG CTA ── */
+.tg-cta {
+  max-width: 960px;
+  margin: 0 auto;
+  border-bottom: 1px solid var(--border);
+  padding: var(--pad-out);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.tg-title { color: var(--white); margin-bottom: 4px; }
+.tg-sub { color: var(--text2); font-size: 12px; }
+
+/* ── FOOTER ── */
+footer {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: var(--pad-in) var(--pad-out);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text3);
+}
+footer a { color: var(--text3); }
+footer a:hover { color: var(--cmd); text-decoration: none; }
+
+/* ── SPINNER ── */
+.spin {
+  display: inline-block;
+  width: 10px; height: 10px;
+  border: 1px solid var(--border);
+  border-top-color: var(--cmd);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── MOBILE ── */
+@media (max-width: 720px) {
+  nav { padding: 0 var(--pad-in); }
+  .nav-links { display: none; }
+  .hero-inner { grid-template-columns: 1fr; }
+  .hero-right { display: none; }
+  .props { grid-template-columns: 1fr; }
+  .prop { border-right: none; }
+  .demo-grid { grid-template-columns: 1fr; }
+  .feat-grid { grid-template-columns: 1fr; }
+  .feat { border-right: none; }
+  .cases-grid { grid-template-columns: 1fr; }
+  .case { border-right: none; }
+  .tg-cta { flex-direction: column; align-items: flex-start; }
+  .diff-grid { grid-template-columns: 1fr; }
+  .diff-hashes { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <span class="nav-logo">nano<span>-vm</span></span>
+    <span style="color:var(--border)">|</span>
+    <ul class="nav-links">
+      <li><a href="#how">how it works</a></li>
+      <li><a href="#demo">demo</a></li>
+      <li><a href="#cases">use cases</a></li>
+    </ul>
+    <div class="nav-spacer"></div>
+    <a href="https://t.me/your_bot" class="nav-cta">[ open in telegram ]</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-inner">
+    <div>
+      <div class="hero-tag">// <span>deterministic ai execution runtime</span></div>
+      <div class="hero-h1">AI programs<br>you can <em>audit.</em></div>
+      <div class="hero-desc">nano-vm runs AI programs deterministically — same input, same output, same hash. Every step is traced, every deviation is flagged. Built for regulated industries where AI decisions must be reproducible.</div>
+      <div class="hero-btns">
+        <a href="#demo" class="btn btn-primary">[ run demo ]</a>
+        <a href="https://github.com/your-org/nano-vm" class="btn">[ github ]</a>
+      </div>
+    </div>
+    <div class="hero-right">
+      <div class="term">
+        <div class="term-bar">
+          <div class="term-dot"></div><div class="term-dot"></div><div class="term-dot"></div>
+          <span class="term-title">tarot_profile.yaml — run #2 of 2</span>
+        </div>
+        <div class="term-body">
+          <div class="prompt"><span class="ps1-path">~/nano-vm</span>&nbsp;<span class="ps1-sym">$</span>&nbsp;<span class="cmd-text">vm run tarot_profile.yaml --input input.json</span></div>
+          <div class="blank"></div>
+          <div class="out"><span class="out-key">step</span>&nbsp;generate_seed&nbsp;&nbsp;&nbsp;<span class="out-ok">ok</span>&nbsp;&nbsp;<span class="out-val">42ms</span>&nbsp;&nbsp;seed=0x8F2A1C</div>
+          <div class="out"><span class="out-key">step</span>&nbsp;draw_cards&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="out-ok">ok</span>&nbsp;&nbsp;<span class="out-val">31ms</span>&nbsp;&nbsp;3 cards drawn</div>
+          <div class="out"><span class="out-key">step</span>&nbsp;llm_interpret&nbsp;&nbsp;<span class="out-ok">ok</span>&nbsp;&nbsp;<span class="out-val">8ms</span>&nbsp;&nbsp;&nbsp;cached</div>
+          <div class="out"><span class="out-key">step</span>&nbsp;respond&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="out-ok">ok</span>&nbsp;&nbsp;<span class="out-val">11ms</span>&nbsp;&nbsp;output sent</div>
+          <div class="blank"></div>
+          <div class="out"><span class="out-key">hash&nbsp;&nbsp;</span><span class="out-hash">9b2c4d6e8f1a3c22</span></div>
+          <div class="out"><span class="out-key">status</span>&nbsp;<span class="out-ok">MATCH</span> — identical to run #1</div>
+          <div class="out"><span class="out-key">cost&nbsp;&nbsp;</span>$0.0000 (llm cached)&nbsp;&nbsp;total 92ms</div>
+          <div class="blank"></div>
+          <div class="prompt"><span class="ps1-path">~/nano-vm</span>&nbsp;<span class="ps1-sym">$</span>&nbsp;<span style="color:var(--text3)">█</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PROPS -->
+<div class="props">
+  <div class="prop">
+    <div class="prop-num">// 01</div>
+    <div class="prop-title">Reproducibility</div>
+    <div class="prop-desc">Identical inputs always produce identical outputs and hashes — across runs, machines, and time.</div>
+  </div>
+  <div class="prop">
+    <div class="prop-num">// 02</div>
+    <div class="prop-title">Tamper detection</div>
+    <div class="prop-desc">Any change to inputs triggers a visible hash divergence with an exact diff pointing to the root cause.</div>
+  </div>
+  <div class="prop">
+    <div class="prop-num">// 03</div>
+    <div class="prop-title">Full observability</div>
+    <div class="prop-desc">Every step is traced with duration, type, and output. No black-box AI decisions, ever.</div>
+  </div>
+</div>
+
+<!-- HOW IT WORKS -->
+<div id="how">
+  <div class="section-head">
+    <span class="sh-num">02</span>
+    <span style="color:var(--text2)">architecture — step types</span>
+    <span class="sh-cursor">_</span>
+  </div>
+  <div class="feat-grid">
+    <div class="feat">
+      <div class="feat-num">// step.type = "local"</div>
+      <div class="feat-title"><span>tool()</span> — local execution</div>
+      <div class="feat-body">Pure Python callables with no side effects. Seeding, card draws, data transforms — always deterministic, zero latency, zero cost.</div>
+    </div>
+    <div class="feat">
+      <div class="feat-num">// step.type = "llm"</div>
+      <div class="feat-title"><span>llm()</span> — cached inference</div>
+      <div class="feat-body">LLM steps are keyed by prompt hash + model name. On repeat runs the response is served from cache — identical output, near-zero cost, &lt;10ms.</div>
+    </div>
+    <div class="feat">
+      <div class="feat-num">// step.type = "condition" | "parallel"</div>
+      <div class="feat-title"><span>condition()</span> + <span>parallel()</span></div>
+      <div class="feat-body">Branch on step outputs, run independent steps concurrently. Complex workflows without sacrificing traceability or hash integrity.</div>
+    </div>
+  </div>
+</div>
+
+<!-- DEMO -->
+<div id="demo">
+  <div class="section-head">
+    <span class="sh-num">03</span>
+    <span style="color:var(--text2)">live demo — tarot under control</span>
+    <span class="sh-cursor">_</span>
+  </div>
+  <div class="demo-area">
+    <div class="demo-tabs">
+      <button class="tab-btn active" id="tab-repeat" onclick="switchTab('repeat')">[ reproducibility ]</button>
+      <button class="tab-btn" id="tab-tamper" onclick="switchTab('tamper')">[ tamper detection ]</button>
+    </div>
+
+    <!-- REPEAT -->
+    <div id="pane-repeat" class="demo-grid">
+      <div>
+        <div class="form-label">reading parameters</div>
+        <div class="field"><div class="field-lbl">name</div><input type="text" id="r-name" value="Anna" placeholder="Anna"></div>
+        <div class="field"><div class="field-lbl">date_of_birth</div><input type="text" id="r-dob" value="12.05.1990" placeholder="12.05.1990"></div>
+        <div class="field"><div class="field-lbl">favourite_color</div><input type="text" id="r-color" value="blue" placeholder="blue"></div>
+        <div class="field"><div class="field-lbl">question</div><textarea id="r-question" rows="3" placeholder="Is relocation the right move?">Is relocation the right move?</textarea></div>
+        <button class="run-btn" id="run-btn" onclick="runTarot()">
+          <span id="spinner" class="spin" style="display:none"></span>
+          <span id="btn-label">[ run ]</span>
+        </button>
+        <button class="action-btn" id="repeat-btn" style="display:none;width:100%;margin-top:8px" onclick="repeatRun()">[ repeat — verify hash ]</button>
+      </div>
+
+      <div class="result-panel">
+        <div class="result-bar" id="run-meta" style="display:none">
+          <span class="meta-k">run_id&nbsp;</span><span class="meta-v" id="meta-id">—</span>
+          &nbsp;&nbsp;
+          <span class="meta-k">duration&nbsp;</span><span class="meta-v" id="meta-dur">—</span>
+          &nbsp;&nbsp;
+          <span class="meta-k">hash&nbsp;</span><span class="meta-v" id="meta-hash">—</span>
+        </div>
+        <div class="result-body">
+          <div class="empty-state" id="empty-state">
+            <span>// awaiting input</span>
+            <span style="color:var(--border)">fill the form and run a reading</span>
+          </div>
+          <div id="trace-output" style="display:none">
+            <div id="trace-list"></div>
+            <div class="hash-line">
+              <span class="hl-k">HASH&nbsp;</span>
+              <span class="hl-v" id="hash-val"></span>
+              <span class="badge" id="hash-badge"></span>
+            </div>
+            <div class="output-block">
+              <div class="output-prompt">// interpretation</div>
+              <div id="output-text"></div>
+            </div>
+            <div class="action-row" id="action-row" style="display:none">
+              <button class="action-btn" onclick="repeatRun()">[ ↺ repeat run ]</button>
+              <button class="action-btn" onclick="resetDemo()">[ × reset ]</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAMPER -->
+    <div id="pane-tamper" class="demo-grid" style="display:none">
+      <div>
+        <div class="form-label">reference input (locked)</div>
+        <div class="field"><div class="field-lbl">name</div><input type="text" id="t-name-a" value="Anna" readonly></div>
+        <div class="field"><div class="field-lbl">date_of_birth</div><input type="text" value="12.05.1990" readonly></div>
+        <div class="field"><div class="field-lbl">question</div><textarea rows="2" readonly>Is relocation the right move?</textarea></div>
+        <div style="border-top:1px solid var(--border);margin:8px 0"></div>
+        <div class="form-label">modified input</div>
+        <div class="field"><div class="field-lbl">name (change one character)</div><input type="text" id="t-name-b" value="Anna_" placeholder="e.g. Annb"></div>
+        <button class="run-btn" onclick="runTamper()">[ compare runs ]</button>
+      </div>
+
+      <div class="result-panel">
+        <div class="result-bar"><span style="color:var(--text3)">// a/b trace comparison</span></div>
+        <div class="result-body">
+          <div class="empty-state" id="tamper-empty">
+            <span>// awaiting comparison</span>
+            <span style="color:var(--border)">click [ compare runs ]</span>
+          </div>
+          <div id="tamper-output" style="display:none"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- USE CASES -->
+<div id="cases">
+  <div class="section-head">
+    <span class="sh-num">04</span>
+    <span style="color:var(--text2)">use cases — regulated industries</span>
+    <span class="sh-cursor">_</span>
+  </div>
+  <div class="cases-grid">
+    <div class="case">
+      <div class="case-sector">// finance</div>
+      <div class="case-title">Loan scoring</div>
+      <div class="case-body">Regulators can replay any credit decision with the original inputs and verify the output hash — proving no model drift or data tampering between runs.</div>
+    </div>
+    <div class="case">
+      <div class="case-sector">// insurance</div>
+      <div class="case-title">Claims assessment</div>
+      <div class="case-body">Every claim evaluation is a frozen, replayable trace. Disputes resolved by running the exact program — not by trusting logs that could have been altered.</div>
+    </div>
+    <div class="case">
+      <div class="case-sector">// healthcare</div>
+      <div class="case-title">Diagnostic support</div>
+      <div class="case-body">Clinical AI recommendations are reproducible artifacts. Any change in patient data is flagged immediately, protecting against silent upstream updates.</div>
+    </div>
+  </div>
+</div>
+
+<!-- TG CTA -->
+<div class="tg-cta">
+  <div>
+    <div class="tg-title">Try the demo bot in Telegram</div>
+    <div class="tg-sub">// Same nano-vm stack. Every response includes a full execution trace.</div>
+  </div>
+  <a href="https://t.me/your_bot" class="btn btn-primary">[ open in telegram ]</a>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <span>// nano-vm — open source runtime for auditable ai processes</span>
+  <div style="display:flex;gap:16px">
+    <a href="#">github/nano-vm</a>
+    <a href="#">nano-vm-mcp</a>
+    <a href="#">nano-vm-vault</a>
+  </div>
+</footer>
+
+<script>
+// ── STATE ──
+let lastRunId = null, lastHash = null;
+
+// ── UTILS ──
+function setLoading(on) {
+  document.getElementById('run-btn').disabled = on;
+  document.getElementById('spinner').style.display = on ? 'inline-block' : 'none';
+  document.getElementById('btn-label').textContent = on ? '[ running... ]' : '[ run ]';
+}
+
+function showError(msg) {
+  setLoading(false);
+  document.getElementById('empty-state').innerHTML =
+    `<span style="color:var(--red)">// error</span><span style="color:var(--border)">${msg}</span>`;
+  document.getElementById('empty-state').style.display = 'flex';
+}
+
+// ── API CALLS ──
+async function apiPost(path, body) {
+  const resp = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  return resp.json();
+}
+
+// ── REPEAT MODE ──
+async function runTarot() {
+  const name = document.getElementById('r-name').value,
+        dob  = document.getElementById('r-dob').value,
+        color = document.getElementById('r-color').value,
+        q    = document.getElementById('r-question').value;
+  if (!name || !dob || !q) return;
+  setLoading(true);
+  try {
+    const result = await apiPost('/api/tarot', { name, dob, color, question: q });
+    const prev = lastHash;
+    lastRunId = result.run_id;
+    lastHash  = result.hash;
+    renderResult(result, prev);
+  } catch (e) {
+    showError(e.message);
+  } finally {
+    setLoading(false);
+  }
+}
+
+async function repeatRun() {
+  if (!lastRunId) return;
+  setLoading(true);
+  try {
+    const result = await apiPost('/api/repeat', { run_id: lastRunId });
+    renderResult(result, lastHash, true);
+    lastHash = result.hash;
+  } catch (e) {
+    showError(e.message);
+  } finally {
+    setLoading(false);
+  }
+}
+
+function renderResult(r, prevHash) {
+  document.getElementById('empty-state').style.display = 'none';
+  document.getElementById('trace-output').style.display = 'block';
+  document.getElementById('run-meta').style.display = 'flex';
+  document.getElementById('repeat-btn').style.display = 'none';
+  document.getElementById('meta-id').textContent  = r.run_id;
+  document.getElementById('meta-dur').textContent = r.duration_ms + 'ms';
+  document.getElementById('meta-hash').textContent = r.hash;
+
+  const list = document.getElementById('trace-list');
+  list.innerHTML = '';
+  (r.steps || []).forEach((s, i) => {
+    const d = document.createElement('div');
+    d.className = `trace-line tl-${i + 1}`;
+    const llm = s.type === 'llm';
+    const ms  = s.duration_ms ?? s.ms ?? 0;
+    d.innerHTML = `<span class="${llm ? 'ti-llm' : 'ti-ok'}">${llm ? '◆' : '✓'}</span><span class="t-id">${s.id}</span><span class="t-type">${s.type}</span><span class="t-det">${s.detail || ''}</span><span class="t-ms">${ms}ms</span>`;
+    list.appendChild(d);
+  });
+
+  const badge = document.getElementById('hash-badge');
+  document.getElementById('hash-val').textContent = r.hash;
+  if (!prevHash)               { badge.textContent = 'INITIAL'; badge.className = 'badge badge-init'; }
+  else if (prevHash === r.hash){ badge.textContent = '✓ MATCH'; badge.className = 'badge badge-match'; }
+  else                         { badge.textContent = '✗ DIFF';  badge.className = 'badge badge-diff'; }
+
+  document.getElementById('output-text').textContent = r.output;
+  document.getElementById('action-row').style.display = 'flex';
+  if (!prevHash) document.getElementById('repeat-btn').style.display = 'block';
+}
+
+function resetDemo() {
+  lastRunId = null; lastHash = null;
+  document.getElementById('empty-state').style.display = 'flex';
+  document.getElementById('empty-state').innerHTML =
+    '<span style="color:var(--text3)">// awaiting input</span><span style="color:var(--border)">fill the form and run a reading</span>';
+  document.getElementById('trace-output').style.display = 'none';
+  document.getElementById('run-meta').style.display = 'none';
+  document.getElementById('repeat-btn').style.display = 'none';
+  document.getElementById('action-row').style.display = 'none';
+}
+
+// ── TAMPER MODE ──
+async function runTamper() {
+  const nameA = document.getElementById('t-name-a').value;
+  const nameB = document.getElementById('t-name-b').value;
+  const dob = '12.05.1990', color = 'blue', q = 'Is relocation the right move?';
+
+  document.getElementById('tamper-empty').style.display = 'none';
+  const out = document.getElementById('tamper-output');
+  out.style.display = 'block';
+  out.innerHTML = '<div style="color:var(--text3);font-size:11px;padding:8px">// running two programs...</div>';
+
+  try {
+    const [runA, runB] = await Promise.all([
+      apiPost('/api/tarot', { name: nameA, dob, color, question: q }),
+      apiPost('/api/tarot', { name: nameB, dob, color, question: q }),
+    ]);
+    renderDiff(runA, runB, nameA, nameB);
+  } catch (e) {
+    out.innerHTML = `<div style="color:var(--red);font-size:11px;padding:8px">// error: ${e.message}</div>`;
+  }
+}
+
+function renderDiff(runA, runB, nameA, nameB) {
+  const hashMatch = runA.hash === runB.hash;
+  const stepsA = runA.steps || [], stepsB = runB.steps || [];
+  const divergedIds = [];
+
+  const rows = stepsA.map((s, i) => {
+    const b = stepsB[i] || s;
+    const differs = s.detail !== b.detail;
+    if (differs) divergedIds.push(s.id);
+    return `<div class="diff-row">
+      <div class="diff-cell diff-ok"><span>${s.id}</span><span>${s.duration_ms ?? s.ms ?? 0}ms</span></div>
+      <div class="diff-cell ${differs ? 'diff-bad' : 'diff-ok'}"><span>${b.id}</span><span>${b.duration_ms ?? b.ms ?? 0}ms</span></div>
+    </div>`;
+  }).join('');
+
+  const out = document.getElementById('tamper-output');
+  out.innerHTML = `
+    <div class="diff-header">
+      <span class="diff-h-a">// A — "${nameA}"</span>
+      <span class="diff-h-b">// B — "${nameB}"</span>
+    </div>
+    ${rows}
+    <div class="diff-hashes">
+      <div class="diff-hash-cell"><span class="hl-k">hash_A&nbsp;</span><span class="hl-v" style="color:var(--cyan)">${runA.hash}</span></div>
+      <div class="diff-hash-cell"><span class="hl-k">hash_B&nbsp;</span><span style="font-size:11px;color:${hashMatch ? 'var(--cyan)' : 'var(--red)'}">${runB.hash}</span></div>
+    </div>
+    ${!hashMatch
+      ? `<div class="diff-reason">// divergence detected — field "name" changed: "${nameA}" → "${nameB}"<br>// diverged steps: ${divergedIds.join(', ')}</div>`
+      : `<div class="diff-reason-ok">// ✓ hashes match — inputs are identical</div>`}
+  `;
+}
+
+// ── TABS ──
+function switchTab(t) {
+  document.getElementById('pane-repeat').style.display = t === 'repeat' ? 'grid' : 'none';
+  document.getElementById('pane-tamper').style.display = t === 'tamper' ? 'grid' : 'none';
+  document.getElementById('tab-repeat').className = 'tab-btn' + (t === 'repeat' ? ' active' : '');
+  document.getElementById('tab-tamper').className = 'tab-btn' + (t === 'tamper' ? ' active' : '');
+}
+
+if (window.Telegram && window.Telegram.WebApp) window.Telegram.WebApp.expand();
+</script>
+</body>
+</html>
