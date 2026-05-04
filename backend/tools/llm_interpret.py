@@ -6,9 +6,7 @@ DEMO_MODE=false → calls real LLM (OpenAI-compatible or Anthropic).
                   Set OPENAI_API_KEY / OPENAI_BASE_URL or ANTHROPIC_API_KEY.
 """
 
-import hashlib
 import os
-from typing import Optional
 
 MOCK_RESPONSES = [
     "The cards reveal a transition long overdue — what appears uncertain is already in motion beneath the surface. Trust the current, not the shore.",
@@ -42,6 +40,7 @@ def _mock_response(seed: int) -> str:
 
 async def _call_openai(prompt: str, api_key: str) -> str:
     import httpx
+
     base_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com")
     model = os.getenv("LLM_MODEL", "gpt-4o-mini")
 
@@ -63,6 +62,7 @@ async def _call_openai(prompt: str, api_key: str) -> str:
 
 async def _call_anthropic(prompt: str, api_key: str) -> str:
     import httpx
+
     model = os.getenv("LLM_MODEL", "claude-haiku-4-5-20251001")
 
     async with httpx.AsyncClient(timeout=30) as client:
