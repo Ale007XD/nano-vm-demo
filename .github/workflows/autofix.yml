@@ -27,14 +27,27 @@ jobs:
       - name: Install Ruff
         run: pip install "ruff>=0.4"
 
+      # ✅ Исправлено: пути backend/ вместо app/ и tests/
       - name: Run Ruff Check (Fixable errors)
-        run: ruff check --fix app tests
+        run: ruff check --fix backend/
         continue-on-error: true
 
       - name: Run Ruff Format
-        run: ruff format app tests
+        run: ruff format backend/
+
+      # ✅ Опционально: проверяем, есть ли изменения перед коммитом
+      - name: Check for changes
+        id: git-check
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "changes=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Commit changes
+        if: steps.git-check.outputs.changes == 'true'
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "style: ruff autofix + format"
+          file_pattern: "backend/**/*"
