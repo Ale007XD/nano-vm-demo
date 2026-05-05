@@ -1,0 +1,27 @@
+{
+    # Global options
+    email {$ACME_EMAIL}
+    # Uncomment for Let's Encrypt staging (testing):
+    # acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+}
+
+{$DOMAIN} {
+    # Proxy everything to nginx frontend
+    reverse_proxy frontend:80
+
+    # Security headers
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        -Server
+    }
+
+    # Logging
+    log {
+        output stderr
+        format console
+        level INFO
+    }
+}

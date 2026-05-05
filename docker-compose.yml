@@ -1,6 +1,30 @@
 version: '3.8'
 
+# ── default profile: http only (no domain needed) ─────────────────────────────
+# ── https profile:   adds Caddy for automatic TLS (requires DOMAIN + ACME_EMAIL)
+# Usage:
+#   HTTP:   docker compose up -d
+#   HTTPS:  docker compose --profile https up -d
+
 services:
+
+  # ── redis: persistent LLM cache ─────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: nano-vm-redis
+    restart: unless-stopped
+    command: redis-server --save 60 1 --loglevel warning
+    volumes:
+      - redis_data:/data
+    networks:
+      - nano-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # ── backend: FastAPI + aiogram ───────────────────────────────────────────────
   backend:
     build: ./backend
     container_name: nano-vm-backend
@@ -12,21 +36,29 @@ services:
       - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://api.openai.com}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - LLM_MODEL=${LLM_MODEL:-gpt-4o-mini}
+      - REDIS_URL=redis://redis:6379/0
     expose:
       - "8000"
+    depends_on:
+      redis:
+        condition: service_healthy
     networks:
       - nano-net
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 15s
 
+  # ── frontend: nginx static + proxy ──────────────────────────────────────────
   frontend:
     build: ./frontend
     container_name: nano-vm-frontend
     restart: unless-stopped
+    expose:
+      - "80"
     ports:
       - "${PORT:-8080}:80"
     depends_on:
@@ -34,6 +66,34 @@ services:
         condition: service_healthy
     networks:
       - nano-net
+
+  # ── caddy: automatic HTTPS (opt-in via --profile https) ─────────────────────
+  caddy:
+    image: caddy:2-alpine
+    container_name: nano-vm-caddy
+    profiles: ["https"]
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      - DOMAIN=${DOMAIN}
+      - ACME_EMAIL=${ACME_EMAIL}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      frontend:
+        condition: service_started
+    networks:
+      - nano-net
+
+volumes:
+  redis_data:
+  caddy_data:
+  caddy_config:
 
 networks:
   nano-net:

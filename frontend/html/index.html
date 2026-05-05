@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>nano-vm — deterministic ai execution</title>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Cousine:ital,wght@0,400;0,700;1,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cousine:wght@400;700&display=swap');
 
 :root {
   --bg:      #0C0C0C;
@@ -23,474 +23,406 @@
   --white:   #EAEAEA;
   --pad-in:  8px;
   --pad-out: 16px;
-  --mono:    'Cousine', 'Consolas', monospace;
+  --mono:    'Cousine','Consolas',monospace;
+  --nav-h:   36px;
+  --bar-h:   0px; /* updated by JS when bar visible */
 }
 
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { scroll-behavior: smooth; }
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
 
-body {
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--mono);
-  font-size: 13px;
-  line-height: 1.6;
-  min-height: 100vh;
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--mono);
+  font-size:13px;
+  line-height:1.6;
+  min-height:100vh;
+  padding-top:calc(var(--nav-h) + var(--bar-h));
 }
 
-a { color: var(--cmd); text-decoration: none; }
-a:hover { text-decoration: underline; }
+a{color:var(--cmd);text-decoration:none;}
+a:hover{text-decoration:underline;}
 
 /* ── NAV ── */
-nav {
-  position: fixed;
-  top: 0; left: 0; right: 0;
-  z-index: 100;
-  background: var(--bg);
-  border-bottom: 1px solid var(--border);
+nav{
+  position:fixed;top:0;left:0;right:0;
+  z-index:100;
+  background:var(--bg);
+  border-bottom:1px solid var(--border);
+  height:var(--nav-h);
 }
-.nav-inner {
-  max-width: 960px;
-  margin: 0 auto;
-  padding: 0 var(--pad-out);
-  height: 36px;
-  display: flex;
-  align-items: center;
-  gap: 16px;
+.nav-inner{
+  max-width:960px;margin:0 auto;padding:0 var(--pad-out);
+  height:100%;display:flex;align-items:center;gap:16px;
 }
-.nav-logo { color: var(--white); font-size: 13px; font-weight: 700; }
-.nav-logo span { color: var(--cmd); }
-.nav-links { display: flex; gap: var(--pad-out); list-style: none; }
-.nav-links a { color: var(--text2); font-size: 12px; }
-.nav-links a:hover { color: var(--text); text-decoration: none; }
-.nav-spacer { flex: 1; }
-.nav-cta {
-  color: var(--cmd);
-  border: 1px solid var(--border);
-  padding: 2px 10px;
-  font-size: 12px;
-  transition: border-color 0.15s;
+.nav-logo{color:var(--white);font-size:13px;font-weight:700;}
+.nav-logo span{color:var(--cmd);}
+.nav-links{display:flex;gap:var(--pad-out);list-style:none;}
+.nav-links a{color:var(--text2);font-size:12px;}
+.nav-links a:hover{color:var(--text);text-decoration:none;}
+.nav-spacer{flex:1;}
+.nav-cta{
+  color:var(--cmd);border:1px solid var(--border);
+  padding:2px 10px;font-size:12px;transition:border-color .15s;
 }
-.nav-cta:hover { border-color: var(--cmd); text-decoration: none; }
+.nav-cta:hover{border-color:var(--cmd);text-decoration:none;}
+
+/* ── STICKY LIVE TRACE BAR ── */
+#trace-bar{
+  position:fixed;
+  top:var(--nav-h);left:0;right:0;
+  z-index:90;
+  background:var(--bg3);
+  border-bottom:1px solid var(--border);
+  height:28px;
+  display:flex;
+  align-items:center;
+  overflow:hidden;
+  opacity:0;
+  pointer-events:none;
+  transition:opacity .25s;
+}
+#trace-bar.visible{opacity:1;pointer-events:auto;}
+
+.tb-inner{
+  display:flex;align-items:center;
+  white-space:nowrap;overflow:hidden;
+  width:100%;height:100%;
+  font-size:11px;
+}
+.tb-label{
+  color:var(--text3);padding:0 10px;
+  border-right:1px solid var(--border);
+  height:100%;display:flex;align-items:center;
+  flex-shrink:0;
+}
+.tb-steps{
+  display:flex;align-items:center;
+  overflow:hidden;flex:1;height:100%;
+}
+.tb-step{
+  display:flex;align-items:center;gap:5px;
+  padding:0 10px;height:100%;
+  border-right:1px solid var(--border);
+  flex-shrink:0;
+  animation:tbfade .2s ease both;
+}
+@keyframes tbfade{from{opacity:0;}to{opacity:1;}}
+.tb-step:nth-child(1){animation-delay:.04s;}
+.tb-step:nth-child(2){animation-delay:.12s;}
+.tb-step:nth-child(3){animation-delay:.22s;}
+.tb-step:nth-child(4){animation-delay:.32s;}
+.tbs-ok {color:var(--green);}
+.tbs-llm{color:var(--cmd);}
+.tbs-id {color:var(--text2);}
+.tbs-ms {color:var(--text3);}
+.tb-hash{
+  padding:0 10px;
+  border-left:1px solid var(--border);
+  margin-left:auto;flex-shrink:0;
+  display:flex;align-items:center;gap:6px;
+  height:100%;
+}
+.tb-hash-val{color:var(--cyan);font-size:11px;}
+.tb-match{color:var(--green);font-size:10px;}
+.tb-diff {color:var(--red);  font-size:10px;}
 
 /* ── HERO ── */
-.hero {
-  padding-top: 36px;
-  border-bottom: 1px solid var(--border);
+.hero{border-bottom:1px solid var(--border);}
+.hero-inner{
+  max-width:960px;margin:0 auto;padding:var(--pad-out);
+  display:grid;grid-template-columns:1fr 1fr;gap:var(--pad-out);align-items:start;
 }
-.hero-inner {
-  max-width: 960px;
-  margin: 0 auto;
-  padding: var(--pad-out);
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--pad-out);
-  align-items: start;
-}
-.hero-tag { color: var(--text3); font-size: 11px; margin-bottom: 12px; }
-.hero-tag span { color: var(--cmd); }
-.hero-h1 { font-size: 22px; font-weight: 700; color: var(--white); line-height: 1.25; margin-bottom: 12px; }
-.hero-h1 em { color: var(--cmd); font-style: normal; }
-.hero-desc { color: var(--text2); font-size: 12px; line-height: 1.7; margin-bottom: 16px; max-width: 380px; }
-.hero-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.hero-tag{color:var(--text3);font-size:11px;margin-bottom:12px;}
+.hero-tag span{color:var(--cmd);}
+.hero-h1{font-size:22px;font-weight:700;color:var(--white);line-height:1.25;margin-bottom:12px;}
+.hero-h1 em{color:var(--cmd);font-style:normal;}
+.hero-desc{color:var(--text2);font-size:12px;line-height:1.7;margin-bottom:16px;max-width:380px;}
+.hero-btns{display:flex;gap:8px;flex-wrap:wrap;}
 
-.btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-family: var(--mono);
-  font-size: 12px;
-  padding: 5px 14px;
-  border: 1px solid var(--border);
-  cursor: pointer;
-  background: transparent;
-  color: var(--text);
-  text-decoration: none;
-  transition: border-color 0.15s, color 0.15s, background 0.15s;
+.btn{
+  display:inline-flex;align-items:center;gap:6px;
+  font-family:var(--mono);font-size:12px;
+  padding:5px 14px;border:1px solid var(--border);
+  cursor:pointer;background:transparent;color:var(--text);
+  text-decoration:none;transition:border-color .15s,color .15s,background .15s;
 }
-.btn:hover { border-color: var(--text2); color: var(--white); text-decoration: none; }
-.btn-primary { border-color: var(--cmd); color: var(--cmd); }
-.btn-primary:hover { background: var(--cmd); color: var(--bg); }
+.btn:hover{border-color:var(--text2);color:var(--white);text-decoration:none;}
+.btn-primary{border-color:var(--cmd);color:var(--cmd);}
+.btn-primary:hover{background:var(--cmd);color:var(--bg);}
 
 /* ── TERMINAL WINDOW ── */
-.term {
-  border: 1px solid var(--border);
-  background: var(--bg);
+.term{border:1px solid var(--border);background:var(--bg);}
+.term-bar{
+  background:var(--bg2);border-bottom:1px solid var(--border);
+  padding:5px var(--pad-in);display:flex;align-items:center;
+  gap:5px;font-size:11px;color:var(--text3);
 }
-.term-bar {
-  background: var(--bg2);
-  border-bottom: 1px solid var(--border);
-  padding: 5px var(--pad-in);
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 11px;
-  color: var(--text3);
-}
-.term-dot { width: 7px; height: 7px; border: 1px solid var(--border); }
-.term-title { margin-left: 6px; }
-.term-body { padding: var(--pad-in); }
-
-.prompt { display: flex; align-items: baseline; gap: 6px; padding: 2px 0; }
-.ps1-path { color: var(--green); }
-.ps1-sym { color: var(--text2); }
-.cmd-text { color: var(--white); }
-.out { color: var(--text2); padding: 1px 0 1px 14px; font-size: 12px; }
-.out-ok { color: var(--green); }
-.out-key { color: var(--cmd); }
-.out-val { color: var(--yellow); }
-.out-hash { color: var(--cyan); }
-.blank { height: 5px; }
+.term-dot{width:7px;height:7px;border:1px solid var(--border);}
+.term-title{margin-left:6px;}
+.term-body{padding:var(--pad-in);}
+.prompt{display:flex;align-items:baseline;gap:6px;padding:2px 0;}
+.ps1-path{color:var(--green);}
+.ps1-sym{color:var(--text2);}
+.cmd-text{color:var(--white);}
+.out{color:var(--text2);padding:1px 0 1px 14px;font-size:12px;}
+.out-ok{color:var(--green);}
+.out-key{color:var(--cmd);}
+.out-val{color:var(--yellow);}
+.out-hash{color:var(--cyan);}
+.blank{height:5px;}
 
 /* ── SECTION HEAD ── */
-.section-head {
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
-  padding: var(--pad-in) var(--pad-out);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 11px;
-  color: var(--text3);
+.section-head{
+  border-top:1px solid var(--border);border-bottom:1px solid var(--border);
+  padding:var(--pad-in) var(--pad-out);
+  display:flex;align-items:center;gap:8px;
+  font-size:11px;color:var(--text3);
 }
-.sh-num { color: var(--cmd); }
-.sh-cursor { color: var(--green); animation: blink 1s step-end infinite; }
-@keyframes blink { 50% { opacity: 0; } }
+.sh-num{color:var(--cmd);}
+.sh-cursor{color:var(--green);animation:blink 1s step-end infinite;}
+@keyframes blink{50%{opacity:0;}}
 
 /* ── PROPS ── */
-.props {
-  display: grid;
-  grid-template-columns: repeat(3,1fr);
-  border-bottom: 1px solid var(--border);
-  max-width: 960px;
-  margin: 0 auto;
+.props{
+  display:grid;grid-template-columns:repeat(3,1fr);
+  border-bottom:1px solid var(--border);
+  max-width:960px;margin:0 auto;
 }
-.prop {
-  padding: var(--pad-out);
-  border-right: 1px solid var(--border);
-}
-.prop:last-child { border-right: none; }
-.prop-num { color: var(--text3); font-size: 11px; margin-bottom: 6px; }
-.prop-title { color: var(--white); margin-bottom: 4px; }
-.prop-desc { color: var(--text2); font-size: 11px; line-height: 1.6; }
+.prop{padding:var(--pad-out);border-right:1px solid var(--border);}
+.prop:last-child{border-right:none;}
+.prop-num{color:var(--text3);font-size:11px;margin-bottom:6px;}
+.prop-title{color:var(--white);margin-bottom:4px;}
+.prop-desc{color:var(--text2);font-size:11px;line-height:1.6;}
 
 /* ── DEMO ── */
-.demo-area {
-  max-width: 960px;
-  margin: 0 auto;
-  padding: var(--pad-out);
+.demo-area{max-width:960px;margin:0 auto;padding:var(--pad-out);}
+.demo-tabs{
+  display:flex;border:1px solid var(--border);border-bottom:none;width:fit-content;
 }
-.demo-tabs {
-  display: flex;
-  border: 1px solid var(--border);
-  border-bottom: none;
-  width: fit-content;
+.tab-btn{
+  font-family:var(--mono);font-size:11px;padding:4px 14px;
+  border:none;background:var(--bg);color:var(--text3);
+  cursor:pointer;border-right:1px solid var(--border);
 }
-.tab-btn {
-  font-family: var(--mono);
-  font-size: 11px;
-  padding: 4px 14px;
-  border: none;
-  background: var(--bg);
-  color: var(--text3);
-  cursor: pointer;
-  border-right: 1px solid var(--border);
-}
-.tab-btn:last-child { border-right: none; }
-.tab-btn.active { background: var(--bg2); color: var(--text); }
-.tab-btn:hover:not(.active) { color: var(--text2); }
+.tab-btn:last-child{border-right:none;}
+.tab-btn.active{background:var(--bg2);color:var(--text);}
+.tab-btn:hover:not(.active){color:var(--text2);}
 
-.demo-grid {
-  display: grid;
-  grid-template-columns: 320px 1fr;
-  gap: var(--pad-out);
-  border: 1px solid var(--border);
-  padding: var(--pad-out);
-  background: var(--bg2);
+.demo-grid{
+  display:grid;grid-template-columns:320px 1fr;gap:var(--pad-out);
+  border:1px solid var(--border);padding:var(--pad-out);background:var(--bg2);
 }
 
 /* ── FORM ── */
-.form-label {
-  color: var(--text3);
-  font-size: 11px;
-  margin-bottom: var(--pad-in);
+.form-label{color:var(--text3);font-size:11px;margin-bottom:var(--pad-in);}
+.form-label::before{content:'# ';color:var(--cmd);}
+.field{margin-bottom:8px;}
+.field-lbl{color:var(--text3);font-size:11px;margin-bottom:3px;}
+.field-lbl::before{content:'> ';}
+.field input,.field textarea{
+  width:100%;background:var(--bg);border:1px solid var(--border);
+  color:var(--white);font-family:var(--mono);font-size:12px;
+  padding:var(--pad-in);outline:none;border-radius:0;resize:none;
+  transition:border-color .15s;
 }
-.form-label::before { content: '# '; color: var(--cmd); }
-.field { margin-bottom: 8px; }
-.field-lbl {
-  color: var(--text3);
-  font-size: 11px;
-  margin-bottom: 3px;
-}
-.field-lbl::before { content: '> '; }
-.field input, .field textarea {
-  width: 100%;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  color: var(--white);
-  font-family: var(--mono);
-  font-size: 12px;
-  padding: var(--pad-in);
-  outline: none;
-  border-radius: 0;
-  resize: none;
-  transition: border-color 0.15s;
-}
-.field input:focus, .field textarea:focus { border-color: var(--cmd); }
-.field input::placeholder, .field textarea::placeholder { color: var(--text3); }
-.field input[readonly], .field textarea[readonly] { color: var(--text2); border-style: dashed; }
+.field input:focus,.field textarea:focus{border-color:var(--cmd);}
+.field input::placeholder,.field textarea::placeholder{color:var(--text3);}
 
-.run-btn {
-  width: 100%;
-  margin-top: 8px;
-  background: var(--bg);
-  border: 1px solid var(--cmd);
-  color: var(--cmd);
-  font-family: var(--mono);
-  font-size: 12px;
-  padding: 7px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  transition: background 0.15s, color 0.15s;
+.run-btn{
+  width:100%;margin-top:8px;background:var(--bg);
+  border:1px solid var(--cmd);color:var(--cmd);
+  font-family:var(--mono);font-size:12px;padding:7px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;
+  transition:background .15s,color .15s;
 }
-.run-btn:hover { background: var(--cmd); color: var(--bg); }
-.run-btn:disabled { border-color: var(--border); color: var(--text3); background: var(--bg); cursor: not-allowed; }
+.run-btn:hover{background:var(--cmd);color:var(--bg);}
+.run-btn:disabled{border-color:var(--border);color:var(--text3);background:var(--bg);cursor:not-allowed;}
 
 /* ── RESULT PANEL ── */
-.result-panel {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  min-height: 340px;
-  display: flex;
-  flex-direction: column;
+.result-panel{
+  background:var(--bg);border:1px solid var(--border);
+  min-height:340px;display:flex;flex-direction:column;
 }
-.result-bar {
-  background: var(--bg2);
-  border-bottom: 1px solid var(--border);
-  padding: 4px var(--pad-in);
-  display: flex;
-  gap: var(--pad-out);
-  font-size: 11px;
-  color: var(--text3);
-  flex-wrap: wrap;
-  min-height: 24px;
+.result-bar{
+  background:var(--bg2);border-bottom:1px solid var(--border);
+  padding:4px var(--pad-in);display:flex;gap:var(--pad-out);
+  font-size:11px;color:var(--text3);flex-wrap:wrap;min-height:24px;
 }
-.meta-k { color: var(--text3); }
-.meta-v { color: var(--cyan); }
-.result-body { padding: var(--pad-in); flex: 1; }
-
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 280px;
-  gap: 5px;
-  color: var(--text3);
-  font-size: 11px;
+.meta-k{color:var(--text3);}
+.meta-v{color:var(--cyan);}
+.result-body{padding:var(--pad-in);flex:1;}
+.empty-state{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:280px;gap:5px;color:var(--text3);font-size:11px;
 }
 
 /* ── TRACE ── */
-.trace-line {
-  display: grid;
-  grid-template-columns: 14px 150px 55px 1fr 55px;
-  gap: 8px;
-  align-items: center;
-  padding: 3px 0;
-  font-size: 12px;
-  border-bottom: 1px solid #161818;
-  animation: fadein 0.2s ease both;
+.trace-line{
+  display:grid;grid-template-columns:14px 150px 55px 1fr 55px;
+  gap:8px;align-items:center;padding:3px 0;font-size:12px;
+  border-bottom:1px solid #161818;animation:fadein .2s ease both;
 }
-.trace-line:last-child { border-bottom: none; }
-@keyframes fadein { from { opacity:0; transform: translateX(-4px); } to { opacity:1; } }
-.tl-1 { animation-delay: 0.04s; }
-.tl-2 { animation-delay: 0.12s; }
-.tl-3 { animation-delay: 0.22s; }
-.tl-4 { animation-delay: 0.32s; }
-.ti-ok  { color: var(--green); }
-.ti-llm { color: var(--cmd); }
-.t-id   { color: var(--white); }
-.t-type { color: var(--text3); font-size: 11px; }
-.t-det  { color: var(--text2); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.t-ms   { color: var(--text3); font-size: 11px; text-align: right; }
+.trace-line:last-child{border-bottom:none;}
+@keyframes fadein{from{opacity:0;transform:translateX(-4px);}to{opacity:1;}}
+.tl-1{animation-delay:.04s;}
+.tl-2{animation-delay:.12s;}
+.tl-3{animation-delay:.22s;}
+.tl-4{animation-delay:.32s;}
+.ti-ok {color:var(--green);}
+.ti-llm{color:var(--cmd);}
+.t-id  {color:var(--white);}
+.t-type{color:var(--text3);font-size:11px;}
+.t-det {color:var(--text2);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.t-ms  {color:var(--text3);font-size:11px;text-align:right;}
 
-.hash-line {
-  margin-top: 8px;
-  padding: var(--pad-in);
-  background: var(--bg2);
-  border: 1px solid var(--border);
-  font-size: 12px;
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  flex-wrap: wrap;
+.hash-line{
+  margin-top:8px;padding:var(--pad-in);background:var(--bg2);
+  border:1px solid var(--border);font-size:12px;
+  display:flex;gap:10px;align-items:center;flex-wrap:wrap;
 }
-.hl-k { color: var(--text3); }
-.hl-v { color: var(--cyan); flex: 1; word-break: break-all; }
+.hl-k{color:var(--text3);}
+.hl-v{color:var(--cyan);flex:1;word-break:break-all;}
+.badge{font-size:10px;padding:1px 8px;border:1px solid;}
+.badge-init {border-color:var(--border);color:var(--text3);}
+.badge-match{border-color:var(--green);color:var(--green);}
+.badge-diff {border-color:var(--red);color:var(--red);}
 
-.badge { font-size: 10px; padding: 1px 8px; border: 1px solid; }
-.badge-init  { border-color: var(--border); color: var(--text3); }
-.badge-match { border-color: var(--green); color: var(--green); }
-.badge-diff  { border-color: var(--red); color: var(--red); }
-
-.output-block {
-  margin-top: 8px;
-  padding: var(--pad-in);
-  background: var(--bg2);
-  border-left: 2px solid var(--cmd);
-  color: var(--text2);
-  font-size: 12px;
-  line-height: 1.7;
-  animation: fadein 0.4s 0.4s ease both;
+.output-block{
+  margin-top:8px;padding:var(--pad-in);
+  background:var(--bg2);border-left:2px solid var(--cmd);
+  color:var(--text2);font-size:12px;line-height:1.7;
+  animation:fadein .4s .4s ease both;
 }
-.output-prompt { color: var(--text3); font-size: 11px; margin-bottom: 4px; }
-
-.action-row { display: flex; gap: 8px; margin-top: 8px; }
-.action-btn {
-  font-family: var(--mono);
-  font-size: 11px;
-  padding: 4px 12px;
-  border: 1px solid var(--border);
-  background: var(--bg);
-  color: var(--text2);
-  cursor: pointer;
-  transition: border-color 0.15s, color 0.15s;
+.output-prompt{color:var(--text3);font-size:11px;margin-bottom:4px;}
+.action-row{display:flex;gap:8px;margin-top:8px;}
+.action-btn{
+  font-family:var(--mono);font-size:11px;padding:4px 12px;
+  border:1px solid var(--border);background:var(--bg);
+  color:var(--text2);cursor:pointer;transition:border-color .15s,color .15s;
 }
-.action-btn:hover { border-color: var(--cmd); color: var(--cmd); }
+.action-btn:hover{border-color:var(--cmd);color:var(--cmd);}
+
+/* ── TAMPER: reference snapshot ── */
+.ref-block{
+  background:var(--bg);border:1px solid var(--border);
+  margin-bottom:8px;padding:4px 0;
+}
+.ref-row{
+  display:flex;align-items:baseline;gap:6px;
+  padding:3px var(--pad-in);border-bottom:1px solid #161818;font-size:12px;
+}
+.ref-row:last-child{border-bottom:none;}
+.ref-key{color:var(--text3);font-size:11px;width:90px;flex-shrink:0;}
+.ref-val{color:var(--white);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+/* ── TAMPER: field selector ── */
+.field-selector{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;}
+.fs-btn{
+  font-family:var(--mono);font-size:10px;padding:3px 9px;
+  border:1px solid var(--border);background:var(--bg);
+  color:var(--text3);cursor:pointer;transition:border-color .1s,color .1s;
+}
+.fs-btn.active{border-color:var(--cmd);color:var(--cmd);}
+.fs-btn:hover:not(.active){color:var(--text2);}
 
 /* ── DIFF ── */
-.diff-header {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin-bottom: 4px;
-  font-size: 11px;
+.diff-header{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:4px;font-size:11px;}
+.diff-h-a{color:var(--green);}
+.diff-h-b{color:var(--red);}
+.diff-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:3px;}
+.diff-cell{padding:3px 6px;font-size:11px;display:flex;justify-content:space-between;}
+.diff-ok {background:#111B12;color:var(--green);}
+.diff-bad{background:#1A1010;color:var(--red);}
+.diff-hashes{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;}
+.diff-hash-cell{padding:var(--pad-in);background:var(--bg2);border:1px solid var(--border);font-size:11px;}
+.diff-reason{
+  margin-top:8px;padding:var(--pad-in);background:#160C0C;
+  border:1px solid var(--red);border-left:2px solid var(--red);
+  color:var(--red);font-size:11px;
 }
-.diff-h-a { color: var(--green); }
-.diff-h-b { color: var(--red); }
-.diff-row  { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 3px; }
-.diff-cell { padding: 3px 6px; font-size: 11px; display: flex; justify-content: space-between; }
-.diff-ok   { background: #111B12; color: var(--green); }
-.diff-bad  { background: #1A1010; color: var(--red); }
-.diff-hashes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
-.diff-hash-cell { padding: var(--pad-in); background: var(--bg2); border: 1px solid var(--border); font-size: 11px; }
-.diff-reason {
-  margin-top: 8px;
-  padding: var(--pad-in);
-  background: #160C0C;
-  border: 1px solid var(--red);
-  border-left: 2px solid var(--red);
-  color: var(--red);
-  font-size: 11px;
-}
-.diff-reason-ok {
-  margin-top: 8px;
-  padding: var(--pad-in);
-  background: #0C160C;
-  border: 1px solid var(--green);
-  border-left: 2px solid var(--green);
-  color: var(--green);
-  font-size: 11px;
+.diff-reason-ok{
+  margin-top:8px;padding:var(--pad-in);background:#0C160C;
+  border:1px solid var(--green);border-left:2px solid var(--green);
+  color:var(--green);font-size:11px;
 }
 
 /* ── FEATURES ── */
-.feat-grid {
-  display: grid;
-  grid-template-columns: repeat(3,1fr);
-  border-bottom: 1px solid var(--border);
-  max-width: 960px;
-  margin: 0 auto;
+.feat-grid{
+  display:grid;grid-template-columns:repeat(3,1fr);
+  border-bottom:1px solid var(--border);max-width:960px;margin:0 auto;
 }
-.feat {
-  padding: var(--pad-out);
-  border-right: 1px solid var(--border);
-}
-.feat:last-child { border-right: none; }
-.feat-num { color: var(--text3); font-size: 11px; margin-bottom: 8px; }
-.feat-title { color: var(--white); margin-bottom: 6px; }
-.feat-title span { color: var(--cmd); }
-.feat-body { color: var(--text2); font-size: 11px; line-height: 1.65; }
+.feat{padding:var(--pad-out);border-right:1px solid var(--border);}
+.feat:last-child{border-right:none;}
+.feat-num{color:var(--text3);font-size:11px;margin-bottom:8px;}
+.feat-title{color:var(--white);margin-bottom:6px;}
+.feat-title span{color:var(--cmd);}
+.feat-body{color:var(--text2);font-size:11px;line-height:1.65;}
 
 /* ── CASES ── */
-.cases-grid {
-  display: grid;
-  grid-template-columns: repeat(3,1fr);
-  border-bottom: 1px solid var(--border);
-  max-width: 960px;
-  margin: 0 auto;
+.cases-grid{
+  display:grid;grid-template-columns:repeat(3,1fr);
+  border-bottom:1px solid var(--border);max-width:960px;margin:0 auto;
 }
-.case { padding: var(--pad-out); border-right: 1px solid var(--border); }
-.case:last-child { border-right: none; }
-.case-sector { color: var(--cmd); font-size: 11px; margin-bottom: 6px; }
-.case-title { color: var(--white); margin-bottom: 6px; }
-.case-body { color: var(--text2); font-size: 11px; line-height: 1.65; }
+.case{padding:var(--pad-out);border-right:1px solid var(--border);}
+.case:last-child{border-right:none;}
+.case-sector{color:var(--cmd);font-size:11px;margin-bottom:6px;}
+.case-title{color:var(--white);margin-bottom:6px;}
+.case-body{color:var(--text2);font-size:11px;line-height:1.65;}
 
 /* ── TG CTA ── */
-.tg-cta {
-  max-width: 960px;
-  margin: 0 auto;
-  border-bottom: 1px solid var(--border);
-  padding: var(--pad-out);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
+.tg-cta{
+  max-width:960px;margin:0 auto;
+  border-bottom:1px solid var(--border);padding:var(--pad-out);
+  display:flex;align-items:center;justify-content:space-between;
+  gap:16px;flex-wrap:wrap;
 }
-.tg-title { color: var(--white); margin-bottom: 4px; }
-.tg-sub { color: var(--text2); font-size: 12px; }
+.tg-title{color:var(--white);margin-bottom:4px;}
+.tg-sub{color:var(--text2);font-size:12px;}
 
 /* ── FOOTER ── */
-footer {
-  max-width: 960px;
-  margin: 0 auto;
-  padding: var(--pad-in) var(--pad-out);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  font-size: 11px;
-  color: var(--text3);
+footer{
+  max-width:960px;margin:0 auto;padding:var(--pad-in) var(--pad-out);
+  display:flex;justify-content:space-between;align-items:center;
+  flex-wrap:wrap;gap:8px;font-size:11px;color:var(--text3);
 }
-footer a { color: var(--text3); }
-footer a:hover { color: var(--cmd); text-decoration: none; }
+footer a{color:var(--text3);}
+footer a:hover{color:var(--cmd);text-decoration:none;}
 
 /* ── SPINNER ── */
-.spin {
-  display: inline-block;
-  width: 10px; height: 10px;
-  border: 1px solid var(--border);
-  border-top-color: var(--cmd);
-  border-radius: 50%;
-  animation: spin 0.6s linear infinite;
+.spin{
+  display:inline-block;width:10px;height:10px;
+  border:1px solid var(--border);border-top-color:var(--cmd);
+  border-radius:50%;animation:spin .6s linear infinite;
 }
-@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes spin{to{transform:rotate(360deg);}}
 
 /* ── MOBILE ── */
-@media (max-width: 720px) {
-  nav { padding: 0 var(--pad-in); }
-  .nav-links { display: none; }
-  .hero-inner { grid-template-columns: 1fr; }
-  .hero-right { display: none; }
-  .props { grid-template-columns: 1fr; }
-  .prop { border-right: none; }
-  .demo-grid { grid-template-columns: 1fr; }
-  .feat-grid { grid-template-columns: 1fr; }
-  .feat { border-right: none; }
-  .cases-grid { grid-template-columns: 1fr; }
-  .case { border-right: none; }
-  .tg-cta { flex-direction: column; align-items: flex-start; }
-  .diff-grid { grid-template-columns: 1fr; }
-  .diff-hashes { grid-template-columns: 1fr; }
+@media(max-width:720px){
+  nav{padding:0 var(--pad-in);}
+  .nav-links{display:none;}
+  .hero-inner{grid-template-columns:1fr;}
+  .hero-right{display:none;}
+  .props{grid-template-columns:1fr;}
+  .prop{border-right:none;}
+  .demo-grid{grid-template-columns:1fr;}
+  .feat-grid{grid-template-columns:1fr;}
+  .feat{border-right:none;}
+  .cases-grid{grid-template-columns:1fr;}
+  .case{border-right:none;}
+  .tg-cta{flex-direction:column;align-items:flex-start;}
+  .diff-hashes{grid-template-columns:1fr;}
+  #trace-bar{height:24px;}
+  .tb-label{display:none;}
+  .trace-line{grid-template-columns:14px 1fr 45px 0 45px;}
+  .t-det{display:none;}
 }
 </style>
 </head>
 <body>
 
+<!-- NAV -->
 <nav>
   <div class="nav-inner">
     <span class="nav-logo">nano<span>-vm</span></span>
@@ -504,6 +436,15 @@ footer a:hover { color: var(--cmd); text-decoration: none; }
     <a href="https://t.me/your_bot" class="nav-cta">[ open in telegram ]</a>
   </div>
 </nav>
+
+<!-- STICKY LIVE TRACE BAR -->
+<div id="trace-bar">
+  <div class="tb-inner">
+    <div class="tb-label">// last run</div>
+    <div class="tb-steps" id="tb-steps"></div>
+    <div class="tb-hash" id="tb-hash"></div>
+  </div>
+</div>
 
 <!-- HERO -->
 <div class="hero">
@@ -600,7 +541,7 @@ footer a:hover { color: var(--cmd); text-decoration: none; }
       <button class="tab-btn" id="tab-tamper" onclick="switchTab('tamper')">[ tamper detection ]</button>
     </div>
 
-    <!-- REPEAT -->
+    <!-- ══ PANE: REPRODUCIBILITY ══ -->
     <div id="pane-repeat" class="demo-grid">
       <div>
         <div class="form-label">reading parameters</div>
@@ -648,17 +589,38 @@ footer a:hover { color: var(--cmd); text-decoration: none; }
       </div>
     </div>
 
-    <!-- TAMPER -->
+    <!-- ══ PANE: TAMPER DETECTION ══ -->
     <div id="pane-tamper" class="demo-grid" style="display:none">
       <div>
-        <div class="form-label">reference input (locked)</div>
-        <div class="field"><div class="field-lbl">name</div><input type="text" id="t-name-a" value="Anna" readonly></div>
-        <div class="field"><div class="field-lbl">date_of_birth</div><input type="text" value="12.05.1990" readonly></div>
-        <div class="field"><div class="field-lbl">question</div><textarea rows="2" readonly>Is relocation the right move?</textarea></div>
-        <div style="border-top:1px solid var(--border);margin:8px 0"></div>
-        <div class="form-label">modified input</div>
-        <div class="field"><div class="field-lbl">name (change one character)</div><input type="text" id="t-name-b" value="Anna_" placeholder="e.g. Annb"></div>
-        <button class="run-btn" onclick="runTamper()">[ compare runs ]</button>
+        <!-- Reference snapshot (mirrors main form) -->
+        <div class="form-label">reference run (from main form)</div>
+        <div class="ref-block" id="t-ref-block">
+          <div class="ref-row"><span class="ref-key">name</span><span class="ref-val" id="t-ref-name">Anna</span></div>
+          <div class="ref-row"><span class="ref-key">date_of_birth</span><span class="ref-val" id="t-ref-dob">12.05.1990</span></div>
+          <div class="ref-row"><span class="ref-key">colour</span><span class="ref-val" id="t-ref-color">blue</span></div>
+          <div class="ref-row"><span class="ref-key">question</span><span class="ref-val" id="t-ref-q">Is relocation the right move?</span></div>
+        </div>
+
+        <!-- Field selector -->
+        <div class="form-label">select field to tamper</div>
+        <div class="field-selector" id="field-selector">
+          <button class="fs-btn active" data-field="name"     onclick="selectField('name')">name</button>
+          <button class="fs-btn"        data-field="dob"      onclick="selectField('dob')">date_of_birth</button>
+          <button class="fs-btn"        data-field="color"    onclick="selectField('color')">colour</button>
+          <button class="fs-btn"        data-field="question" onclick="selectField('question')">question</button>
+        </div>
+
+        <!-- Dynamic edit field -->
+        <div class="form-label" id="tamper-edit-label">modified value for: <span style="color:var(--cmd)">name</span></div>
+        <div class="field">
+          <input type="text" id="t-edit-input" placeholder="change one character…">
+          <textarea id="t-edit-textarea" rows="3" placeholder="change something…" style="display:none;margin-top:4px"></textarea>
+        </div>
+
+        <button class="run-btn" id="tamper-run-btn" onclick="runTamper()">
+          <span id="tamper-spinner" class="spin" style="display:none"></span>
+          <span id="tamper-btn-label">[ compare runs ]</span>
+        </button>
       </div>
 
       <div class="result-panel">
@@ -666,14 +628,15 @@ footer a:hover { color: var(--cmd); text-decoration: none; }
         <div class="result-body">
           <div class="empty-state" id="tamper-empty">
             <span>// awaiting comparison</span>
-            <span style="color:var(--border)">click [ compare runs ]</span>
+            <span style="color:var(--border)">select a field, modify it, click compare</span>
           </div>
           <div id="tamper-output" style="display:none"></div>
         </div>
       </div>
     </div>
-  </div>
-</div>
+
+  </div><!-- demo-area -->
+</div><!-- demo -->
 
 <!-- USE CASES -->
 <div id="cases">
@@ -721,49 +684,96 @@ footer a:hover { color: var(--cmd); text-decoration: none; }
 </footer>
 
 <script>
-// ── STATE ──
-let lastRunId = null, lastHash = null;
+// ════════════════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════════════════
+let lastRunId   = null;
+let lastHash    = null;
+let activeField = 'name';   // selected tamper field
 
-// ── UTILS ──
+// ════════════════════════════════════════════════════════
+// TRACE BAR
+// ════════════════════════════════════════════════════════
+const BAR_H = 28;
+
+function showTraceBar(result, prevHash) {
+  const bar   = document.getElementById('trace-bar');
+  const steps = document.getElementById('tb-steps');
+  const hash  = document.getElementById('tb-hash');
+
+  // build steps
+  steps.innerHTML = '';
+  (result.steps || []).forEach(s => {
+    const isLLM = s.type === 'llm';
+    const el = document.createElement('div');
+    el.className = 'tb-step';
+    el.innerHTML =
+      `<span class="${isLLM ? 'tbs-llm' : 'tbs-ok'}">${isLLM ? '◆' : '✓'}</span>` +
+      `<span class="tbs-id">${s.id}</span>` +
+      `<span class="tbs-ms">${s.duration_ms ?? s.ms ?? 0}ms</span>`;
+    steps.appendChild(el);
+  });
+
+  // hash + badge
+  let badgeHtml = '';
+  if (!prevHash)                 badgeHtml = '';
+  else if (prevHash===result.hash) badgeHtml = '<span class="tb-match">✓ MATCH</span>';
+  else                             badgeHtml = '<span class="tb-diff">✗ DIFF</span>';
+
+  hash.innerHTML =
+    `<span class="tb-hash-val">${result.hash}</span>` + badgeHtml;
+
+  // show bar, expand body
+  bar.classList.add('visible');
+  document.documentElement.style.setProperty('--bar-h', BAR_H + 'px');
+}
+
+// ════════════════════════════════════════════════════════
+// API
+// ════════════════════════════════════════════════════════
+async function apiPost(path, body) {
+  const r = await fetch(path, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(body)
+  });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
+
+// ════════════════════════════════════════════════════════
+// REPRODUCIBILITY PANE
+// ════════════════════════════════════════════════════════
 function setLoading(on) {
   document.getElementById('run-btn').disabled = on;
-  document.getElementById('spinner').style.display = on ? 'inline-block' : 'none';
-  document.getElementById('btn-label').textContent = on ? '[ running... ]' : '[ run ]';
+  document.getElementById('spinner').style.display     = on ? 'inline-block' : 'none';
+  document.getElementById('btn-label').textContent     = on ? '[ running... ]' : '[ run ]';
 }
 
 function showError(msg) {
   setLoading(false);
-  document.getElementById('empty-state').innerHTML =
-    `<span style="color:var(--red)">// error</span><span style="color:var(--border)">${msg}</span>`;
-  document.getElementById('empty-state').style.display = 'flex';
+  const es = document.getElementById('empty-state');
+  es.innerHTML = `<span style="color:var(--red)">// error</span><span style="color:var(--border)">${msg}</span>`;
+  es.style.display = 'flex';
 }
 
-// ── API CALLS ──
-async function apiPost(path, body) {
-  const resp = await fetch(path, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-  return resp.json();
-}
-
-// ── REPEAT MODE ──
 async function runTarot() {
-  const name = document.getElementById('r-name').value,
-        dob  = document.getElementById('r-dob').value,
-        color = document.getElementById('r-color').value,
-        q    = document.getElementById('r-question').value;
+  const name  = document.getElementById('r-name').value;
+  const dob   = document.getElementById('r-dob').value;
+  const color = document.getElementById('r-color').value;
+  const q     = document.getElementById('r-question').value;
   if (!name || !dob || !q) return;
+
   setLoading(true);
   try {
     const result = await apiPost('/api/tarot', { name, dob, color, question: q });
     const prev = lastHash;
-    lastRunId = result.run_id;
-    lastHash  = result.hash;
+    lastRunId  = result.run_id;
+    lastHash   = result.hash;
     renderResult(result, prev);
-  } catch (e) {
+    showTraceBar(result, prev);
+    syncTamperRef();        // keep tamper pane in sync
+  } catch(e) {
     showError(e.message);
   } finally {
     setLoading(false);
@@ -775,9 +785,11 @@ async function repeatRun() {
   setLoading(true);
   try {
     const result = await apiPost('/api/repeat', { run_id: lastRunId });
-    renderResult(result, lastHash, true);
+    const prev = lastHash;
     lastHash = result.hash;
-  } catch (e) {
+    renderResult(result, prev);
+    showTraceBar(result, prev);
+  } catch(e) {
     showError(e.message);
   } finally {
     setLoading(false);
@@ -785,30 +797,36 @@ async function repeatRun() {
 }
 
 function renderResult(r, prevHash) {
-  document.getElementById('empty-state').style.display = 'none';
+  document.getElementById('empty-state').style.display  = 'none';
   document.getElementById('trace-output').style.display = 'block';
-  document.getElementById('run-meta').style.display = 'flex';
-  document.getElementById('repeat-btn').style.display = 'none';
-  document.getElementById('meta-id').textContent  = r.run_id;
-  document.getElementById('meta-dur').textContent = r.duration_ms + 'ms';
+  document.getElementById('run-meta').style.display     = 'flex';
+  document.getElementById('repeat-btn').style.display   = 'none';
+
+  document.getElementById('meta-id').textContent   = r.run_id;
+  document.getElementById('meta-dur').textContent  = r.duration_ms + 'ms';
   document.getElementById('meta-hash').textContent = r.hash;
 
   const list = document.getElementById('trace-list');
   list.innerHTML = '';
   (r.steps || []).forEach((s, i) => {
-    const d = document.createElement('div');
+    const d   = document.createElement('div');
     d.className = `trace-line tl-${i + 1}`;
     const llm = s.type === 'llm';
     const ms  = s.duration_ms ?? s.ms ?? 0;
-    d.innerHTML = `<span class="${llm ? 'ti-llm' : 'ti-ok'}">${llm ? '◆' : '✓'}</span><span class="t-id">${s.id}</span><span class="t-type">${s.type}</span><span class="t-det">${s.detail || ''}</span><span class="t-ms">${ms}ms</span>`;
+    d.innerHTML =
+      `<span class="${llm ? 'ti-llm' : 'ti-ok'}">${llm ? '◆' : '✓'}</span>` +
+      `<span class="t-id">${s.id}</span>` +
+      `<span class="t-type">${s.type}</span>` +
+      `<span class="t-det">${s.detail || ''}</span>` +
+      `<span class="t-ms">${ms}ms</span>`;
     list.appendChild(d);
   });
 
   const badge = document.getElementById('hash-badge');
   document.getElementById('hash-val').textContent = r.hash;
-  if (!prevHash)               { badge.textContent = 'INITIAL'; badge.className = 'badge badge-init'; }
-  else if (prevHash === r.hash){ badge.textContent = '✓ MATCH'; badge.className = 'badge badge-match'; }
-  else                         { badge.textContent = '✗ DIFF';  badge.className = 'badge badge-diff'; }
+  if (!prevHash)                { badge.textContent='INITIAL'; badge.className='badge badge-init'; }
+  else if (prevHash===r.hash)   { badge.textContent='✓ MATCH'; badge.className='badge badge-match'; }
+  else                          { badge.textContent='✗ DIFF';  badge.className='badge badge-diff'; }
 
   document.getElementById('output-text').textContent = r.output;
   document.getElementById('action-row').style.display = 'flex';
@@ -817,77 +835,183 @@ function renderResult(r, prevHash) {
 
 function resetDemo() {
   lastRunId = null; lastHash = null;
-  document.getElementById('empty-state').style.display = 'flex';
-  document.getElementById('empty-state').innerHTML =
-    '<span style="color:var(--text3)">// awaiting input</span><span style="color:var(--border)">fill the form and run a reading</span>';
+  const es = document.getElementById('empty-state');
+  es.innerHTML = '<span style="color:var(--text3)">// awaiting input</span><span style="color:var(--border)">fill the form and run a reading</span>';
+  es.style.display = 'flex';
   document.getElementById('trace-output').style.display = 'none';
-  document.getElementById('run-meta').style.display = 'none';
-  document.getElementById('repeat-btn').style.display = 'none';
-  document.getElementById('action-row').style.display = 'none';
+  document.getElementById('run-meta').style.display     = 'none';
+  document.getElementById('repeat-btn').style.display   = 'none';
+  document.getElementById('action-row').style.display   = 'none';
+  // hide trace bar
+  document.getElementById('trace-bar').classList.remove('visible');
+  document.documentElement.style.setProperty('--bar-h', '0px');
 }
 
-// ── TAMPER MODE ──
-async function runTamper() {
-  const nameA = document.getElementById('t-name-a').value;
-  const nameB = document.getElementById('t-name-b').value;
-  const dob = '12.05.1990', color = 'blue', q = 'Is relocation the right move?';
+// ════════════════════════════════════════════════════════
+// TAMPER PANE
+// ════════════════════════════════════════════════════════
 
-  document.getElementById('tamper-empty').style.display = 'none';
+// Mirror main form values into the reference block
+function syncTamperRef() {
+  document.getElementById('t-ref-name').textContent  = document.getElementById('r-name').value   || '—';
+  document.getElementById('t-ref-dob').textContent   = document.getElementById('r-dob').value    || '—';
+  document.getElementById('t-ref-color').textContent = document.getElementById('r-color').value  || '—';
+  document.getElementById('t-ref-q').textContent     = document.getElementById('r-question').value || '—';
+  // pre-fill edit field with reference value
+  prefillEditField();
+}
+
+// Sync on every keystroke in main form
+['r-name','r-dob','r-color','r-question'].forEach(id => {
+  document.getElementById(id).addEventListener('input', () => {
+    syncTamperRef();
+    // reset tamper result if inputs changed
+    document.getElementById('tamper-empty').style.display  = 'flex';
+    document.getElementById('tamper-output').style.display = 'none';
+  });
+});
+
+function getMainValues() {
+  return {
+    name:  document.getElementById('r-name').value,
+    dob:   document.getElementById('r-dob').value,
+    color: document.getElementById('r-color').value,
+    q:     document.getElementById('r-question').value,
+  };
+}
+
+function prefillEditField() {
+  const v = getMainValues();
+  const map = { name: v.name, dob: v.dob, color: v.color, question: v.q };
+  const val = map[activeField] || '';
+  const inp = document.getElementById('t-edit-input');
+  const ta  = document.getElementById('t-edit-textarea');
+  if (activeField === 'question') {
+    inp.style.display = 'none';
+    ta.style.display  = 'block';
+    ta.value = val;
+  } else {
+    inp.style.display = 'block';
+    ta.style.display  = 'none';
+    inp.value = val;
+  }
+}
+
+function selectField(field) {
+  activeField = field;
+  // update button states
+  document.querySelectorAll('.fs-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.field === field);
+  });
+  // update label
+  document.getElementById('tamper-edit-label').innerHTML =
+    `modified value for: <span style="color:var(--cmd)">${field}</span>`;
+  // fill edit field with current reference value
+  prefillEditField();
+  // clear result
+  document.getElementById('tamper-empty').style.display  = 'flex';
+  document.getElementById('tamper-output').style.display = 'none';
+}
+
+function getModifiedValue() {
+  if (activeField === 'question') return document.getElementById('t-edit-textarea').value;
+  return document.getElementById('t-edit-input').value;
+}
+
+function setTamperLoading(on) {
+  document.getElementById('tamper-run-btn').disabled   = on;
+  document.getElementById('tamper-spinner').style.display    = on ? 'inline-block' : 'none';
+  document.getElementById('tamper-btn-label').textContent    = on ? '[ running... ]' : '[ compare runs ]';
+}
+
+async function runTamper() {
+  const base = getMainValues();
+  const modVal = getModifiedValue();
+
+  // build A (original) and B (tampered) payloads
+  const payloadA = { name: base.name, dob: base.dob, color: base.color, question: base.q };
+  const payloadB = { ...payloadA };
+  if (activeField === 'name')     payloadB.name     = modVal;
+  if (activeField === 'dob')      payloadB.dob      = modVal;
+  if (activeField === 'color')    payloadB.color     = modVal;
+  if (activeField === 'question') payloadB.question  = modVal;
+
+  document.getElementById('tamper-empty').style.display  = 'none';
   const out = document.getElementById('tamper-output');
   out.style.display = 'block';
   out.innerHTML = '<div style="color:var(--text3);font-size:11px;padding:8px">// running two programs...</div>';
 
+  setTamperLoading(true);
   try {
     const [runA, runB] = await Promise.all([
-      apiPost('/api/tarot', { name: nameA, dob, color, question: q }),
-      apiPost('/api/tarot', { name: nameB, dob, color, question: q }),
+      apiPost('/api/tarot', payloadA),
+      apiPost('/api/tarot', payloadB),
     ]);
-    renderDiff(runA, runB, nameA, nameB);
-  } catch (e) {
+    renderDiff(runA, runB, payloadA, payloadB);
+  } catch(e) {
     out.innerHTML = `<div style="color:var(--red);font-size:11px;padding:8px">// error: ${e.message}</div>`;
+  } finally {
+    setTamperLoading(false);
   }
 }
 
-function renderDiff(runA, runB, nameA, nameB) {
-  const hashMatch = runA.hash === runB.hash;
-  const stepsA = runA.steps || [], stepsB = runB.steps || [];
-  const divergedIds = [];
+function renderDiff(runA, runB, payA, payB) {
+  const hashMatch  = runA.hash === runB.hash;
+  const stepsA     = runA.steps || [];
+  const stepsB     = runB.steps || [];
+  const diverged   = [];
 
   const rows = stepsA.map((s, i) => {
-    const b = stepsB[i] || s;
+    const b      = stepsB[i] || s;
     const differs = s.detail !== b.detail;
-    if (differs) divergedIds.push(s.id);
+    if (differs) diverged.push(s.id);
+    const msA = s.duration_ms ?? s.ms ?? 0;
+    const msB = b.duration_ms ?? b.ms ?? 0;
     return `<div class="diff-row">
-      <div class="diff-cell diff-ok"><span>${s.id}</span><span>${s.duration_ms ?? s.ms ?? 0}ms</span></div>
-      <div class="diff-cell ${differs ? 'diff-bad' : 'diff-ok'}"><span>${b.id}</span><span>${b.duration_ms ?? b.ms ?? 0}ms</span></div>
+      <div class="diff-cell diff-ok"><span>${s.id}</span><span>${msA}ms</span></div>
+      <div class="diff-cell ${differs ? 'diff-bad' : 'diff-ok'}"><span>${b.id}</span><span>${msB}ms</span></div>
     </div>`;
   }).join('');
+
+  // build label: show what changed
+  const changedField = activeField;
+  const origVal  = payA[changedField === 'question' ? 'question' : changedField];
+  const newVal   = payB[changedField === 'question' ? 'question' : changedField];
+  const labelA   = `// A — ${changedField}: "${origVal}"`;
+  const labelB   = `// B — ${changedField}: "${newVal}"`;
 
   const out = document.getElementById('tamper-output');
   out.innerHTML = `
     <div class="diff-header">
-      <span class="diff-h-a">// A — "${nameA}"</span>
-      <span class="diff-h-b">// B — "${nameB}"</span>
+      <span class="diff-h-a">${labelA}</span>
+      <span class="diff-h-b">${labelB}</span>
     </div>
     ${rows}
     <div class="diff-hashes">
       <div class="diff-hash-cell"><span class="hl-k">hash_A&nbsp;</span><span class="hl-v" style="color:var(--cyan)">${runA.hash}</span></div>
-      <div class="diff-hash-cell"><span class="hl-k">hash_B&nbsp;</span><span style="font-size:11px;color:${hashMatch ? 'var(--cyan)' : 'var(--red)'}">${runB.hash}</span></div>
+      <div class="diff-hash-cell"><span class="hl-k">hash_B&nbsp;</span><span style="font-size:11px;color:${hashMatch?'var(--cyan)':'var(--red)'}">${runB.hash}</span></div>
     </div>
     ${!hashMatch
-      ? `<div class="diff-reason">// divergence detected — field "name" changed: "${nameA}" → "${nameB}"<br>// diverged steps: ${divergedIds.join(', ')}</div>`
-      : `<div class="diff-reason-ok">// ✓ hashes match — inputs are identical</div>`}
-  `;
+      ? `<div class="diff-reason">// divergence — field "${changedField}" changed<br>// diverged steps: ${diverged.join(', ') || 'none detected'}</div>`
+      : `<div class="diff-reason-ok">// ✓ hashes match — inputs are effectively identical</div>`
+    }`;
 }
 
-// ── TABS ──
+// ════════════════════════════════════════════════════════
+// TABS
+// ════════════════════════════════════════════════════════
 function switchTab(t) {
-  document.getElementById('pane-repeat').style.display = t === 'repeat' ? 'grid' : 'none';
-  document.getElementById('pane-tamper').style.display = t === 'tamper' ? 'grid' : 'none';
-  document.getElementById('tab-repeat').className = 'tab-btn' + (t === 'repeat' ? ' active' : '');
-  document.getElementById('tab-tamper').className = 'tab-btn' + (t === 'tamper' ? ' active' : '');
+  document.getElementById('pane-repeat').style.display = t==='repeat' ? 'grid' : 'none';
+  document.getElementById('pane-tamper').style.display = t==='tamper' ? 'grid' : 'none';
+  document.getElementById('tab-repeat').className = 'tab-btn' + (t==='repeat' ? ' active' : '');
+  document.getElementById('tab-tamper').className = 'tab-btn' + (t==='tamper' ? ' active' : '');
+  if (t === 'tamper') syncTamperRef();
 }
 
+// ════════════════════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════════════════════
+syncTamperRef();
 if (window.Telegram && window.Telegram.WebApp) window.Telegram.WebApp.expand();
 </script>
 </body>
